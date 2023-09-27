@@ -233,25 +233,21 @@ class NDArray:
         Reshape the matrix without copying memory.  This will return a matrix
         that corresponds to a reshaped array but points to the same memory as
         the original array.
-
         Raises:
             ValueError if product of current shape is not equal to the product
             of the new shape, or if the matrix is not compact.
-
         Args:
             new_shape (tuple): new shape of the array
-
         Returns:
-            NDArray : reshaped array; this will point to thep
+            NDArray : reshaped array; this will point to the same memory as the original NDArray.
         """
 
         ### BEGIN YOUR SOLUTION
         return self.compact().as_strided(new_shape, NDArray.compact_strides(new_shape))
         ### END YOUR SOLUTION
-
     def permute(self, new_axes):
         """
-        Permute order of the dimensions.  new_axes describes a permuation of the
+        Permute order of the dimensions.  new_axes describes a permutation of the
         existing axes, so e.g.:
           - If we have an array with dimension "BHWC" then .permute((0,3,1,2))
             would convert this to "BCHW" order.
@@ -259,11 +255,9 @@ class NDArray:
         Like reshape, this operation should not copy memory, but achieves the
         permuting by just adjusting the shape/strides of the array.  That is,
         it returns a new array that has the dimensions permuted as desired, but
-        which points to the same memroy as the original array.
-
+        which points to the same memory as the original array.
         Args:
-            new_axes (tuple): permuation order of the dimensions
-
+            new_axes (tuple): permutation order of the dimensions
         Returns:
             NDarray : new NDArray object with permuted dimensions, pointing
             to the same memory as the original NDArray (i.e., just shape and
@@ -271,11 +265,10 @@ class NDArray:
         """
 
         ### BEGIN YOUR SOLUTION
-        new_strides = tuple([self.strides[i] for i in new_axes])
-        new_shape = tuple([self.shape[i] for i in new_axes])
-        return self.as_strided(new_shape, new_strides)
+        shape = tuple([self.shape[axis] for axis in new_axes])
+        strides = tuple([self.strides[axis] for axis in new_axes])
+        return self.as_strided(shape, strides)
         ### END YOUR SOLUTION
-
     def broadcast_to(self, new_shape):
         """
         Broadcast an array to a new shape.  new_shape's elements must be the
@@ -283,24 +276,18 @@ class NDArray:
         the size = 1 (which can then be broadcast to any size).  As with the
         previous calls, this will not copy memory, and just achieves
         broadcasting by manipulating the strides.
-
         Raises:
             assertion error if new_shape[i] != shape[i] for all i where
             shape[i] != 1
-
         Args:
             new_shape (tuple): shape to broadcast to
-
         Returns:
             NDArray: the new NDArray object with the new broadcast shape; should
             point to the same memory as the original array.
         """
+
         ### BEGIN YOUR SOLUTION
-        new_strides = list(self.strides)
-        for i, d in enumerate(self.shape):
-            assert d == 1 or new_shape[i] == d
-            if d == 1:
-                new_strides[i] = 0
+        new_strides = [0 if d == 1 else self.strides[i] for i, d in enumerate(self.shape)]
         return self.as_strided(new_shape, tuple(new_strides))
         ### END YOUR SOLUTION
 
@@ -368,14 +355,9 @@ class NDArray:
         assert len(idxs) == self.ndim, "Need indexes equal to number of dimensions"
 
         ### BEGIN YOUR SOLUTION
-        new_offset = 0
-        new_shape = list(self.shape)
-        new_strides = list(self.strides)
-        for i, sli in enumerate(idxs):
-            new_offset += self.strides[i] * sli.start
-            new_shape[i] = math.ceil((sli.stop - sli.start) / sli.step)
-            new_strides[i] = self.strides[i] * sli.step
-        # print(new_shape, new_strides)
+        new_offset = sum(self.strides[i] * sli.start for i, sli in enumerate(idxs))
+        new_shape = [math.ceil((sli.stop - sli.start) / sli.step) for sli in idxs]
+        new_strides = [self.strides[i] * sli.step for i, sli in enumerate(idxs)]
         return NDArray.make(tuple(new_shape), tuple(new_strides), self.device, self._handle, new_offset)
         ### END YOUR SOLUTION
 
@@ -580,50 +562,21 @@ class NDArray:
         self.device.reduce_max(view.compact()._handle, out._handle, view.shape[-1])
         return out
 
-
     def flip(self, axes):
-        """
-        Flip this ndarray along the specified axes.
-        Note: compact() before returning.
-        """
-        ### BEGIN YOUR SOLUTION
         if axes is None:
             axes = range(len(self.strides))
-        offset_sum = 0
-        new_strides = list(self.strides)
-        for axis in axes:
-            # NOTE -1!!!
-            offset_sum += (self.shape[axis] - 1) * self.strides[axis]
-            new_strides[axis] = -self.strides[axis]
-        
-        ret = NDArray.make(
-            shape=self.shape, 
-            strides=tuple(new_strides), 
-            device=self.device, 
-            handle=self._handle, 
-            offset=offset_sum
-        )
+        offset_sum = sum((self.shape[axis] - 1) * self.strides[axis] for axis in axes)
+        new_strides = [-self.strides[axis] if axis in axes else self.strides[axis] for axis in range(len(self.strides))]
+        ret = NDArray.make(shape=self.shape, strides=tuple(new_strides), device=self.device,handle=self._handle, offset=offset_sum)
         return ret.compact()
-        ### END YOUR SOLUTION
-
 
     def pad(self, axes):
-        """
-        Pad this ndarray by zeros by the specified amount in `axes`,
-        which lists for _all_ axes the left and right padding amount, e.g.,
-        axes = ( (0, 0), (1, 1), (0, 0)) pads the middle axis with a 0 on the left and right side.
-        """
-        ### BEGIN YOUR SOLUTION
-        new_shape = list(self.shape)
-        for i, ax in enumerate(axes):
-            new_shape[i] += ax[0] + ax[1]
-        # NOTE not self.make!!!
+        new_shape = [self.shape[i] + ax[0] + ax[1] for i, ax in enumerate(axes)]
         ret = NDArray.make(tuple(new_shape), device=self.device)
         ret.fill(0)
-        slices = [slice(ax[0], ax[0]+self.shape[i]) for i, ax in enumerate(axes)]
+        slices = [slice(ax[0], ax[0] + self.shape[i]) for i, ax in enumerate(axes)]
         ret[tuple(slices)] = self
         return ret
-        ### END YOUR SOLUTION
 
 
 
