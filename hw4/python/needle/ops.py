@@ -157,10 +157,8 @@ class EWiseDiv(TensorOp):
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         lhs, rhs = node.inputs
-        grad_a = out_grad / rhs
-        grad_b = -out_grad * lhs / (rhs ** 2)
-        return (grad_a, grad_b)
-        ### END YOUR SOLUTION
+        return out_grad / rhs, -out_grad*lhs /(rhs**2)
+      ### END YOUR SOLUTION
 
 
 def divide(a, b):
@@ -192,14 +190,14 @@ class Transpose(TensorOp):
 
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
-        order = list(range(len(a.shape)))
-        if self.axes is None:
-            order[-1] = order[-2]
-            order[-2] = len(order) - 1
-        else:
-            order[self.axes[0]] = self.axes[1]
-            order[self.axes[1]] = self.axes[0]
-        return a.permute(tuple(order))
+  
+      order = list(range(len(a.shape)))
+      if self.axes is None:
+        order[-1], order[-2] = order[-2], order[-1]
+      else:
+        order[self.axes[0]], order[self.axes[1]] = order[self.axes[1]], order[self.axes[0]]
+      return a.permute(tuple(order))
+
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
@@ -226,10 +224,8 @@ class Reshape(TensorOp):
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        shape = node.inputs[0].shape
-        return reshape(out_grad, shape)
+        return reshape(out_grad, node.inputs[0].shape)
         ### END YOUR SOLUTION
-
 
 def reshape(a, shape):
     return Reshape(shape)(a)
@@ -240,27 +236,16 @@ class BroadcastTo(TensorOp):
         self.shape = shape
 
     def compute(self, a):
-        # new_shape = [1] * len(self.shape)
-        # j = 0
-        # for i, s in enumerate(self.shape):
-        #     if j == len(a.shape):
-        #         break
-        #     if s == a.shape[j]:
-        #         new_shape[i] = a.shape[j]
-        #         j += 1
-        # a = a.reshape(new_shape)
-        return array_api.broadcast_to(a, self.shape).compact()
+        return array_api.broadcast_to(a, self.shape)
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
-        shape = list(node.inputs[0].shape) # (10, ) -> (2, 10)
-        axes = []
-        shape = [1] * (len(self.shape) - len(shape)) + shape
-        for i, s in enumerate(self.shape):
-            if i >= len(shape) or s != shape[i]:
-                axes.append(i)
-        return reshape(summation(out_grad, tuple(axes)), node.inputs[0].shape)
-        ### END YOUR SOLUTION
+      ### BEGIN YOUR SOLUTION
+      input_shape = list(node.inputs[0].shape)
+      output_shape = list(out_grad.shape)
+      pad_input_shape = [1] * (len(output_shape) - len(input_shape)) + input_shape
+      del_axis = [i for i, (old_dim, new_dim) in enumerate(zip(pad_input_shape, output_shape)) if old_dim != new_dim]
+      return reshape(summation(out_grad, tuple(del_axis)), tuple(input_shape))
+      ### END YOUR SOLUTION
 
 
 def broadcast_to(a, shape):
@@ -318,22 +303,22 @@ def summation(a, axes=None):
 class MatMul(TensorOp):
     def compute(self, a, b):
         ### BEGIN YOUR SOLUTION
-        return a @ b
+        return a@b
         ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
         lhs, rhs = node.inputs
-        grad_a = matmul(out_grad, transpose(rhs))
-        grad_b = matmul(transpose(lhs), out_grad)
-        if grad_a.shape != lhs.shape: 
-            length = len(grad_a.shape) - len(lhs.shape)
-            grad_a = summation(grad_a, axes=tuple(range(length)))
-        if grad_b.shape != rhs.shape:
-            length = len(grad_b.shape) - len(rhs.shape)
-            grad_b = summation(grad_b, axes=tuple(range(length)))
-        return grad_a, grad_b 
-        ### END YOUR SOLUTION
+        left_grad = matmul(out_grad, transpose(rhs))
+        right_grad = matmul(transpose(lhs), out_grad)
+        if len(lhs.shape) > len(rhs.shape):
+            del_axis = array_api.arange(len(lhs.shape)-len(rhs.shape))
+            right_grad = summation(matmul(transpose(lhs), out_grad), tuple(del_axis))
+        if len(lhs.shape) < len(rhs.shape):
+            del_axis = array_api.arange(len(rhs.shape)-len(lhs.shape))
+            left_grad = summation(matmul(out_grad, transpose(rhs)), tuple(del_axis))
+        return left_grad, right_grad
+              ### END YOUR SOLUTION
 
 
 def matmul(a, b):
@@ -355,7 +340,6 @@ class Negate(TensorOp):
 def negate(a):
     return Negate()(a)
 
-
 class Log(TensorOp):
     def compute(self, a):
         ### BEGIN YOUR SOLUTION
@@ -364,9 +348,9 @@ class Log(TensorOp):
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        return out_grad / node.inputs[0]
+        a=node.inputs[0]
+        return out_grad/a
         ### END YOUR SOLUTION
-
 
 def log(a):
     return Log()(a)
@@ -380,9 +364,9 @@ class Exp(TensorOp):
 
     def gradient(self, out_grad, node):
         ### BEGIN YOUR SOLUTION
-        return exp(node.inputs[0]) * out_grad
+        a=node.inputs[0]
+        return out_grad * exp(a)
         ### END YOUR SOLUTION
-
 
 def exp(a):
     return Exp()(a)
@@ -411,7 +395,6 @@ class LogSumExp(TensorOp):
         self.axes = axes
 
     def compute(self, Z):
-        ### BEGIN YOUR SOLUTION
         maxz = Z.max(self.axes, keepdims=True)
         ret = array_api.log(array_api.exp(Z - maxz.broadcast_to(Z.shape)).sum(axis=self.axes, keepdims=True)) + maxz
         if self.axes is None:
@@ -420,37 +403,21 @@ class LogSumExp(TensorOp):
             axes = [self.axes]
         else:
             axes = list(self.axes)
-        
-        if self.axes is not None:
-            out_shape = [size for i, size in enumerate(Z.shape) if i not in axes]
-        else:
-            out_shape = [1]
-        
+        out_shape = [size for i, size in enumerate(Z.shape) if i not in axes] if self.axes is not None else [1]
         return ret.reshape(tuple(out_shape))
-        ### END YOUR SOLUTION
 
     def gradient(self, out_grad, node):
-        ### BEGIN YOUR SOLUTION
         Z = node.inputs[0]
-        if self.axes is not None:
-            shape = [1] * len(Z.shape)
-            if isinstance(self.axes, int):
-                s = set([self.axes])
-            else:
-                s = set(self.axes)
-            j = 0
-            for i in range(len(shape)):
-                if i not in s:
-                    shape[i] = node.shape[j]
-                    j += 1
-            node_new = node.reshape(shape)
-            grad_new = out_grad.reshape(shape)
-        else:
-            node_new = node
-            grad_new = out_grad
+        shape = [1] * len(Z.shape)
+        s = set([self.axes]) if isinstance(self.axes, int) else set(self.axes)
+        j = 0
+        for i in range(len(shape)):
+            if i not in s:
+                shape[i] =node.shape[j]
+                j += 1
+        node_new = node.reshape(shape) if self.axes is not None else node
+        grad_new = out_grad.reshape(shape) if self.axes is not None else out_grad
         return grad_new.broadcast_to(Z.shape) * exp(Z - node_new.broadcast_to(Z.shape))
-        ### END YOUR SOLUTION
-
 
 def logsumexp(a, axes=None):
     return LogSumExp(axes=axes)(a)
