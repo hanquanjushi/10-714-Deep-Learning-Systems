@@ -413,12 +413,18 @@ def find_topo_sort(node_list: List[Value]) -> List[Value]:
 def topo_sort_dfs(node, visited, topo_order):
     """Post-order DFS"""
     ### BEGIN YOUR SOLUTION
-    if node in visited: return
+    # If the node has already been visited, return
+    if node in visited:
+        return
 
-    for next in node.inputs:
-        topo_sort_dfs(next, visited, topo_order)
-    
+    # Mark the node as visited
     visited.add(node)
+
+    # Recursively traverse all predecessors of the node
+    for predecessor in node.inputs:
+        topo_sort_dfs(predecessor, visited, topo_order)
+
+    # Add the node to the inputstopological sort order
     topo_order.append(node)
     ### END YOUR SOLUTION
 
