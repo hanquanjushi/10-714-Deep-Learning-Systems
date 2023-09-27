@@ -68,17 +68,17 @@ def ones_like(array, *, device=None, requires_grad=False):
     )
 
 
-def xavier_uniform(fan_in, fan_out, shape=None, gain=1.0, **kwargs):
+def xavier_uniform(fan_in, fan_out,  gain=1.0, **kwargs):
     ### BEGIN YOUR SOLUTION
     a = gain * math.sqrt(6 / (fan_in + fan_out))
     return a * (2 * rand(*shape, **kwargs) - 1)
     ### END YOUR SOLUTION
 
 
-def xavier_normal(fan_in, fan_out, shape=None, gain=1.0, **kwargs):
+def xavier_uniform(fan_in, fan_out, gain=1.0, **kwargs):
     ### BEGIN YOUR SOLUTION
-    std=gain * math.sqrt(2/(fan_in+fan_out))
-    return randn(fan_in, fan_out, mean=0, std=std, **kwargs)
+    a= gain*math.sqrt(6/(fan_in+fan_out))
+    return rand(fan_in, fan_out, low=-a, high=a, **kwargs)
     ### END YOUR SOLUTION
 
 
@@ -100,5 +100,4 @@ def kaiming_normal(fan_in, fan_out, shape=None, nonlinearity="relu", **kwargs):
         return randn(*shape, mean=0, std=std, **kwargs)
     return randn(*(fan_in, fan_out), mean=0, std=std, **kwargs)
     ### END YOUR SOLUTION
-
 
