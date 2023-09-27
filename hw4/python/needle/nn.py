@@ -88,41 +88,16 @@ class Linear(Module):
         self.out_features = out_features
 
         ### BEGIN YOUR SOLUTION
-        self.weight= Parameter(
-            init.kaiming_uniform(
-                in_features, 
-                out_features, 
-                shape=(in_features, out_features),
-                device=device,
-                dtype=dtype, 
-                requires_grad=True
-            )
-        )
+        self.weight = Parameter(init.kaiming_uniform(in_features, out_features, shape=(in_features, out_features), device=device, dtype=dtype, requires_grad=True))
         # NOTE: this line below will change type(self.bias) from 'Parameter' into 'ndl.Tensor'!
         # self.bias = Parameter(init.kaiming_uniform(out_features, 1, requires_grad=True)).reshape((1, out_features))
-        if bias:
-            self.bias = Parameter(
-                init.kaiming_uniform(
-                    out_features, 
-                    1,
-                    shape=(out_features, 1),
-                    device=device,
-                    dtype=dtype, 
-                    requires_grad=True
-                    ).reshape((1, out_features)
-                )
-            )
-        else:
-            self.bias = None
+        self.bias = Parameter(init.kaiming_uniform(out_features, 1, shape=(out_features, 1), device=device, dtype=dtype, requires_grad=True).reshape((1, out_features))) if bias else None
         ### END YOUR SOLUTION
 
     def forward(self, X: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
         X_mul_weight = X @ self.weight
-        if self.bias:
-            return X_mul_weight + self.bias.broadcast_to(X_mul_weight.shape)
-        else:
-            return X_mul_weight
+        return X_mul_weight + self.bias.broadcast_to(X_mul_weight.shape) if self.bias else X_mul_weight
         ### END YOUR SOLUTION
 
 
@@ -157,7 +132,6 @@ class Sigmoid(Module):
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
         return (1 + ops.exp(-x)) ** (-1)
-        # return ops.exp(x) / (1 + ops.exp(x))
         ### END YOUR SOLUTION
 
 
@@ -200,7 +174,7 @@ class BatchNorm1d(Module):
         ### BEGIN YOUR SOLUTION
         batch_size = x.shape[0]
         mean = x.sum((0, )) / batch_size
-        # NOTE reshape before broadcast
+     
         x_minus_mean = x - mean.reshape((1, x.shape[1])).broadcast_to(x.shape)
         var = (x_minus_mean ** 2).sum((0, )) / batch_size
         
@@ -212,9 +186,7 @@ class BatchNorm1d(Module):
             x_normed = x_minus_mean / x_std
             return x_normed * self.weight.reshape((1, self.dim)).broadcast_to(x.shape) + self.bias.reshape((1, self.dim)).broadcast_to(x.shape)
         else:
-            # NOTE no momentum here!
             x_normed = (x - self.running_mean.reshape((1, self.dim)).broadcast_to(x.shape)) / (self.running_var.reshape((1, self.dim)).broadcast_to(x.shape) + self.eps) ** 0.5
-            # NOTE testing time also need self.weight and self.bias
             return x_normed * self.weight.reshape((1, self.dim)).broadcast_to(x.shape) + self.bias.reshape((1, self.dim)).broadcast_to(x.shape)
         ### END YOUR SOLUTION
 
@@ -238,7 +210,6 @@ class LayerNorm1d(Module):
         self.eps = eps
         ### BEGIN YOUR SOLUTION
         self.weight = Parameter(init.ones(self.dim, device=device, dtype=dtype, requires_grad=True))
-        # NOTE bias initialized to 0!!!
         self.bias = Parameter(init.zeros(self.dim, device=device, dtype=dtype, requires_grad=True))
         ### END YOUR SOLUTION
 
@@ -246,13 +217,10 @@ class LayerNorm1d(Module):
         ### BEGIN YOUR SOLUTION
         batch_size = x.shape[0]
         feature_size = x.shape[1]
-        # NOTE reshape before broadcast
         mean = x.sum(axes=(1, )).reshape((batch_size, 1)) / feature_size
-        
-        # NOTE need manual broadcast_to!!!
+
         x_minus_mean = x - mean.reshape((x.shape[0], 1)).broadcast_to(x.shape)
         x_std = ((x_minus_mean ** 2).sum(axes=(1, )).reshape((batch_size, 1)) / feature_size + self.eps) ** 0.5
-        # NOTE need manual broadcast_to!!!
         normed = x_minus_mean / x_std.reshape((x.shape[0], 1)).broadcast_to(x.shape)
         
         return self.weight.reshape((x.shape[0], 1)).broadcast_to(x.shape) * normed + self.bias.reshape((x.shape[0], 1)).broadcast_to(x.shape)
@@ -260,18 +228,15 @@ class LayerNorm1d(Module):
 
 
 class Dropout(Module):
-    def __init__(self, p=0.5):
+    def __init__(self, p = 0.5):
         super().__init__()
         self.p = p
 
     def forward(self, x: Tensor) -> Tensor:
         ### BEGIN YOUR SOLUTION
-        # NOTE Dropout is training only
-        # NOTE 1 - self.p
-        mask = init.randb(*x.shape, p=1 - self.p, device=x.device, dtype=x.dtype)
         if self.training:
-            x_mask = x * mask
-            return x_mask / (1 - self.p)
+            mask = init.randb(*x.shape, p=1-self.p)
+            return x * mask / (1 - self.p)
         else:
             return x
         ### END YOUR SOLUTION
