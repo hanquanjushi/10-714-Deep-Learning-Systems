@@ -69,3 +69,4 @@ class Adam(Optimizer):
             v_hat = (self.v[i]) / (1 - self.beta2 ** self.t)
             param.data = param.data - self.lr * m_hat / (v_hat ** 0.5 + self.eps) 
         ### END YOUR SOLUTION
+

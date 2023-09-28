@@ -25,15 +25,21 @@ def ResidualBlock(dim, hidden_dim, norm=nn.BatchNorm1d, drop_prob=0.1):
     ### END YOUR SOLUTION
 
 
-def MLPResNet(dim, hidden_dim=100, num_blocks=3, num_classes=10, norm=nn.BatchNorm1d, drop_prob=0.1):
-    ### BEGIN YOUR SOLUTION
-    modules = [nn.Linear(dim, hidden_dim), nn.ReLU()]
-    for i in range(num_blocks):
-        modules.append(ResidualBlock(hidden_dim, hidden_dim//2, norm, drop_prob))
-    modules.append(nn.Linear(hidden_dim, num_classes))
-    return nn.Sequential(*modules)
-    ### END YOUR SOLUTION
+class MLPResNet(nn.Module):
+    def __init__(self, dim, hidden_dim=100, num_blocks=3, num_classes=10, norm=nn.BatchNorm1d, drop_prob=0.1):
+        super(MLPResNet, self).__init__()
+        
+        modules = [nn.Linear(dim, hidden_dim), nn.ReLU()]
+        
+        for i in range(num_blocks):
+            block = ResidualBlock(hidden_dim, hidden_dim // 2, norm, drop_prob)
+            modules.append(block)
+        
+        modules.append(nn.Linear(hidden_dim, num_classes))
+        self.modules = nn.Sequential(*modules)
 
+    def forward(self, x):
+        return self.modules(x)
 
 
 
@@ -85,6 +91,7 @@ def train_mnist(batch_size=100, epochs=10, optimizer=ndl.optim.Adam,
     train_loader = ndl.data.DataLoader(train_data, batch_size)
     test_loader = ndl.data.DataLoader(test_data, batch_size)
     model = MLPResNet(784, hidden_dim=hidden_dim)
+   
     opt = optimizer(model.parameters(), lr=lr, weight_decay=weight_decay)
 
     for _ in range(epochs):
