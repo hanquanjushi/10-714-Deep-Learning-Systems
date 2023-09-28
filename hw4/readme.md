@@ -1,1 +1,1 @@
-hw4
+In this homework, we will leverage all of the components built in the last three homeworks to solve some modern problems with high performing network structures.  We will start by adding a few new ops leveraging our new CPU/CUDA backends.  Then, we will implement convolution, and a convolutional neural network to train a classifier on the CIFAR-10 image classification dataset.  Then, we will implement recurrent and long-short term memory (LSTM) neural networks, and do word-level prediction language modeling on the Penn Treebank dataset.
