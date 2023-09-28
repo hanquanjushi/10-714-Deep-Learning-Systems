@@ -1,4 +1,3 @@
-# Homework 2
-
-Public repository and stub/testing code for Homework 2 of 10-714.
+# hw2
+It is an implementation of a neural network library in the needle framework.
 
